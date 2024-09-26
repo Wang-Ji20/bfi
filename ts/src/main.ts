@@ -5,12 +5,18 @@ const MEMORY_SIZE = 32768;
 class InputHandler {
     static INSTANCE = new InputHandler();
     private buffer: string[] = [];
+    private stdinClosed = false;
     private stopWaiting: (() => void) | null = null;
     private constructor() {
         process.stdin.on('data', (data) => {
             const input = data.toString();
             for (const c of input) {
-                this.buffer.push(c);
+                if (c.charCodeAt(0) == 26) {
+                    this.stdinClosed = true;
+                }
+                if (!this.stdinClosed) {
+                    this.buffer.push(c);
+                }
             }
             if (this.stopWaiting) {
                 this.stopWaiting();
@@ -21,6 +27,10 @@ class InputHandler {
     async getInput() {
         const self = this;
         while (this.buffer.length == 0) {
+            if (this.stdinClosed) {
+                console.log('Trying to read input after stdin is closed');
+                throw new Error();
+            }
             await new Promise<void>((resolve) => {
                 if (self.stopWaiting) {
                     self.stopWaiting();
@@ -50,13 +60,13 @@ const main = async () => {
         const command = code.charAt(pc);
         if (command == '+') {
             memory[pointer]++;
-            if (memory[pointer] == 128) {
-                memory[pointer] = -128;
+            if (memory[pointer] == 256) {
+                memory[pointer] = 0;
             }
         } else if (command == '-') {
             memory[pointer]--;
-            if (memory[pointer] == -129) {
-                memory[pointer] = 127;
+            if (memory[pointer] == -1) {
+                memory[pointer] = 255;
             }
         } else if (command == '>') {
             pointer++;
@@ -71,28 +81,37 @@ const main = async () => {
                 return 1;
             }
         } else if (command == ',') {
-            memory[pointer] = await InputHandler.INSTANCE.getInput();
+            try {
+                memory[pointer] = await InputHandler.INSTANCE.getInput();
+            } catch (e) {
+                return 1;
+            }
         } else if (command == '.') {
             process.stdout.write(String.fromCharCode(memory[pointer]));
         } else if (command == '[') {
-            stack.push(pc);
             if (memory[pointer] == 0) {
-                while (code[pc] != ']') {
+                while (true) {
                     pc++;
-                    if (pc >= code.length) {
-                        console.log(`Missing ']' of '[' at position ${pc + 1}`);
-                        return 1;
+                    if (code[pc] == '[') {
+                        stack.push(-1);
+                    } else if (code[pc] == ']') {
+                        if (stack.length == 0 || stack[stack.length - 1] != -1) {
+                            break;
+                        }
+                        stack.pop();
                     }
                 }
+            } else {
+                stack.push(pc);
             }
         } else if (command == ']') {
-            if (stack.length == 0) {
-                console.log(`Missing '[' of ']' at position ${pc + 1}`);
-                return 1;
-            }
             if (memory[pointer] != 0) {
+                if (stack.length == 0) {
+                    console.log(`Missing '[' of ']' at position ${pc + 1}`);
+                    return 1;
+                }
                 pc = stack[stack.length - 1];
-            } else {
+            } else if (stack.length != 0) {
                 stack.pop();
             }
         }
