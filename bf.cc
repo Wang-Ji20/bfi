@@ -40,11 +40,11 @@ auto main(int argc, char **argv) -> int {
   }
   auto source = read_file(argv[1]);
 
-  for (int cursor = 0; cursor < source.size(); cursor++) {
+  for (int pc = 0; pc < source.size(); pc++) {
     if (pointer < 0 || pointer >= MEMORY_SIZE) {
       panic("null pointer at {}\n", pointer);
     }
-    char c = source[cursor];
+    char c = source[pc];
     switch (c) {
     case '+':
       memory[pointer]++;
@@ -65,11 +65,22 @@ auto main(int argc, char **argv) -> int {
       putchar(memory[pointer]);
       break;
     case '[':
-      stack.push(cursor);
       if (not memory[pointer]) {
-        while (source[cursor] != ']' && cursor < source.size()) {
-          cursor++;
+        int nest_counter = 0;
+        while (pc < source.size()) {
+          pc++;
+          if (source[pc] == '[') {
+            nest_counter++;
+          }
+          if (source[pc] == ']') {
+            nest_counter--;
+          }
+          if (nest_counter == -1) {
+            break;
+          }
         }
+      } else {
+        stack.push(pc);
       }
       break;
     case ']':
@@ -77,7 +88,7 @@ auto main(int argc, char **argv) -> int {
         panic("pop from empty stack\n");
       }
       if (memory[pointer]) {
-        cursor = stack.top();
+        pc = stack.top();
       } else {
         stack.pop();
       }
