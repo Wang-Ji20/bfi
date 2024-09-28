@@ -1,0 +1,21 @@
+(lang dune 3.16)
+
+(name bfi)
+
+(generate_opam_files true)
+
+(authors "Ji Wang")
+
+(maintainers "Ji Wang")
+
+(license MIT)
+
+(package
+ (name bfi)
+ (synopsis "BF Interpreter")
+ (description "BFI interprets the brainfuck programming language")
+ (depends ocaml dune)
+ (tags
+  (interpreter bf)))
+
+; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html

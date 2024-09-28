@@ -1,0 +1,3 @@
+(executable
+ (public_name bfi)
+ (name main))
