@@ -21,28 +21,31 @@
 
 (define (incr x) (+ 1 x))
 
+(define (byte-incr x) (modulo (incr x) 256))
+
 (define (decr x) (- x 1))
+
+(define (byte-decr x) (modulo (+ (decr x) 256) 256))
 
 (define (change-memory inst memory pointer)
   (let ([*p (vector-ref memory pointer)])
     (cond
       [(equal? #\+ inst)
-       (begin (vector-set! memory pointer (incr *p))
+       (begin (vector-set! memory pointer (byte-incr *p))
               memory)]
       [(equal? #\- inst)
-       (begin (vector-set! memory pointer (decr *p))
+       (begin (vector-set! memory pointer (byte-decr *p))
               memory)]
       [(equal? #\, inst)
        (let ([in (read-char (current-input-port))])
-         (begin (vector-set! memory pointer in)
+         (begin (vector-set! memory pointer (char->integer in))
                 memory))]
       [else memory])))
 
 (check-equal? (let ([init-state (init-state)])
                 (change-memory #\+ (bf-runtime-memory init-state) (bf-runtime-pointer init-state)))
               (let ([v (make-vector BFMEMORY 0)])
-                (begin (vector-set! v 0 1)
-                       v)))
+                (begin (vector-set! v 0 1) v)))
 
 (define (change-pointer inst pointer)
   (cond
@@ -67,8 +70,7 @@
 
 (let* ([s "[1[[1]1]]11"]
        [v (list->vector (string->list s))])
-  (check-equal? (find-matching-rparen v 0)
-                9))
+  (check-equal? (find-matching-rparen v 0) 9))
 
 (define (change-pc inst tape *p stack pc)
   (let  ([spc (+ 1 pc)])
@@ -79,8 +81,8 @@
 
 (define (change-stack inst *p pc stack)
   (cond
-    [(equal? inst #\[) (if (equal? 0 *p) stack (cons (incr pc) stack))]
-    [(equal? inst #\]) (if (equal? 0 *p) (cdr stack) stack)]
+    [(and (equal? inst #\[) (not (equal? 0 *p))) (cons (incr pc) stack)]
+    [(and (equal? inst #\]) (equal? 0 *p)) (cdr stack)]
     [else stack]))
 
 (define (handle-side-effect inst *p)
@@ -106,6 +108,6 @@
         [len (vector-length tape)])
     (if (equal? pc len) runtime (eval-bf-all (eval-bf runtime tape) tape))))
 
-(define hello-world "++++++++++/[/>+++++++>++++++++++>+++>+<<<<-/]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.")
+(define ed (port->string (open-input-file "./test/ed.bf")))
 
-(eval-bf-all (init-state) (to-tape hello-world))
+(eval-bf-all (init-state) (to-tape ed))
