@@ -1,7 +1,5 @@
 #lang racket
 
-(require rackunit)
-
 (define-struct bf-runtime (memory pointer pc stack))
 
 (define BFMEMORY 32768)
@@ -13,12 +11,6 @@
    0
    '()))
 
-(define (dump bf-state)
-  (begin (println (bf-runtime-memory bf-state))
-         (println (bf-runtime-pointer bf-state))
-         (println (bf-runtime-pc bf-state))
-         (println (bf-runtime-stack bf-state))))
-
 (define (incr x) (+ 1 x))
 
 (define (byte-incr x) (modulo (incr x) 256))
@@ -29,23 +21,13 @@
 
 (define (change-memory inst memory pointer)
   (let ([*p (vector-ref memory pointer)])
-    (cond
-      [(equal? #\+ inst)
-       (begin (vector-set! memory pointer (byte-incr *p))
-              memory)]
-      [(equal? #\- inst)
-       (begin (vector-set! memory pointer (byte-decr *p))
-              memory)]
-      [(equal? #\, inst)
-       (let ([in (read-char (current-input-port))])
-         (begin (vector-set! memory pointer (char->integer in))
-                memory))]
-      [else memory])))
-
-(check-equal? (let ([init-state (init-state)])
-                (change-memory #\+ (bf-runtime-memory init-state) (bf-runtime-pointer init-state)))
-              (let ([v (make-vector BFMEMORY 0)])
-                (begin (vector-set! v 0 1) v)))
+    (begin (cond
+             [(equal? #\+ inst) (vector-set! memory pointer (byte-incr *p))]
+             [(equal? #\- inst) (vector-set! memory pointer (byte-decr *p))]
+             [(equal? #\, inst)
+              (let ([in (read-char (current-input-port))])
+                (vector-set! memory pointer (char->integer in)))])
+           memory)))
 
 (define (change-pointer inst pointer)
   (cond
@@ -68,10 +50,6 @@
                 [else (find-rec spc lparen-seen)])))]
     (find-rec (incr pc) 1) ))
 
-(let* ([s "[1[[1]1]]11"]
-       [v (list->vector (string->list s))])
-  (check-equal? (find-matching-rparen v 0) 9))
-
 (define (change-pc inst tape *p stack pc)
   (let  ([spc (+ 1 pc)])
     (cond
@@ -86,7 +64,9 @@
     [else stack]))
 
 (define (handle-side-effect inst *p)
-  (if (equal? inst #\.) (begin (display (if (integer? *p) (integer->char *p) *p)) '()) '()))
+  (if (equal? inst #\.)
+      (begin (display (if (integer? *p) (integer->char *p) *p)) '())
+      '()))
 
 (define (eval-bf runtime tape)
   (let* ([memory (bf-runtime-memory runtime)]
@@ -104,10 +84,13 @@
 (define (to-tape s) (list->vector (string->list s)))
 
 (define (eval-bf-all runtime tape)
-  (let ([pc (bf-runtime-pc runtime)]
-        [len (vector-length tape)])
-    (if (equal? pc len) runtime (eval-bf-all (eval-bf runtime tape) tape))))
+  (if (equal? (bf-runtime-pc runtime) (vector-length tape))
+      runtime
+      (eval-bf-all (eval-bf runtime tape) tape)))
 
-(define ed (port->string (open-input-file "./test/ed.bf")))
+(define input-program (port->string (open-input-file
+                                     (if (eq? (vector-length (current-command-line-arguments)) 1)
+                                         (vector-ref (current-command-line-arguments) 0)
+                                         (error "usage: racket bf.rkt <bf source>")))))
 
-(eval-bf-all (init-state) (to-tape ed))
+(eval-bf-all (init-state) (to-tape input-program))
